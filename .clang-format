@@ -1,0 +1,4 @@
+IndentWidth: 4
+AlignAfterOpenBracket: BlockIndent
+AllowShortFunctionsOnASingleLine: Empty
+InsertBraces: true
