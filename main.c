@@ -15,7 +15,7 @@ typedef struct {
     bool quit;
 } App;
 
-static App app_new(void) {
+static App app_new(char const *image_path) {
     auto display = XOpenDisplay(NULL);
     assert(display && "failed to open display");
 
@@ -33,7 +33,7 @@ static App app_new(void) {
     XSetWindowBackgroundPixmap(display, window, None);
     XMapWindow(display, window);
 
-    auto image = imlib_load_image("image.jpg");
+    auto image = imlib_load_image(image_path);
     assert(image && "failed to open image");
     imlib_context_set_image(image);
     imlib_context_set_display(display);
@@ -111,8 +111,10 @@ static void app_deinit(App const *app) {
     imlib_free_image();
 }
 
-int main(void) {
-    auto app = app_new();
+int main(int argc, char *argv[]) {
+    auto image_path = argc > 1 ? argv[1] : "image.jpg";
+
+    auto app = app_new(image_path);
     while (!app.quit) {
         app_run(&app);
     }
