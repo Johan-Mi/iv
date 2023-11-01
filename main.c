@@ -11,6 +11,7 @@ enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600 };
 typedef struct {
     Display *display;
     Window window;
+    int window_width, window_height;
     bool quit;
 } App;
 
@@ -26,7 +27,9 @@ static App app_new(void) {
     );
 
     XStoreName(display, window, "iv");
-    XSelectInput(display, window, ExposureMask | KeyPressMask);
+    XSelectInput(
+        display, window, ExposureMask | KeyPressMask | StructureNotifyMask
+    );
     XMapWindow(display, window);
 
     auto image = imlib_load_image("image.jpg");
@@ -39,12 +42,32 @@ static App app_new(void) {
     return (App){
         .display = display,
         .window = window,
+        .window_width = DEFAULT_WIDTH,
+        .window_height = DEFAULT_HEIGHT,
         .quit = false,
     };
 }
 
-static void render(void) {
-    imlib_render_image_on_drawable(0, 0);
+static void render(Imlib_Updates updates) {
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
+    imlib_render_image_part_on_drawable_at_size(
+        x, y, width, height, x, y, width, height
+    );
+}
+
+static void render_all_updates(App const *app, Imlib_Updates updates) {
+    updates = imlib_updates_merge_for_rendering(
+        updates, app->window_width, app->window_height
+    );
+    for (auto update = updates; update;
+         update = imlib_updates_get_next(update)) {
+        render(update);
+    }
+    imlib_updates_free(updates);
 }
 
 static void handle_key_press(App *app, XKeyEvent *event) {
@@ -55,16 +78,30 @@ static void handle_key_press(App *app, XKeyEvent *event) {
 }
 
 static void app_run(App *app) {
-    XEvent event;
-    XNextEvent(app->display, &event);
-    switch (event.type) {
-    case Expose:
-        render();
-        break;
-    case KeyPress:
-        handle_key_press(app, &event.xkey);
-        break;
-    }
+    auto updates = imlib_updates_init();
+
+    do {
+        XEvent event;
+        XNextEvent(app->display, &event);
+        switch (event.type) {
+        case Expose: {
+            auto expose = event.xexpose;
+            updates = imlib_update_append_rect(
+                updates, expose.x, expose.y, expose.width, expose.height
+            );
+        } break;
+        case KeyPress:
+            handle_key_press(app, &event.xkey);
+            break;
+        case ConfigureNotify: {
+            auto size = event.xconfigure;
+            app->window_width = size.width;
+            app->window_height = size.height;
+        } break;
+        }
+    } while (XPending(app->display));
+
+    render_all_updates(app, updates);
 }
 
 static void app_deinit(App const *app) {
