@@ -30,6 +30,7 @@ static App app_new(void) {
     XSelectInput(
         display, window, ExposureMask | KeyPressMask | StructureNotifyMask
     );
+    XSetWindowBackgroundPixmap(display, window, None);
     XMapWindow(display, window);
 
     auto image = imlib_load_image("image.jpg");
