@@ -43,7 +43,7 @@ static App app_new(void) {
     };
 }
 
-static void render(App const *app) {
+static void render(void) {
     imlib_render_image_on_drawable(0, 0);
 }
 
@@ -59,7 +59,7 @@ static void app_run(App *app) {
     XNextEvent(app->display, &event);
     switch (event.type) {
     case Expose:
-        render(app);
+        render();
         break;
     case KeyPress:
         handle_key_press(app, &event.xkey);
