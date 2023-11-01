@@ -1,3 +1,4 @@
+#include <Imlib2.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <assert.h>
@@ -28,6 +29,13 @@ static App app_new(void) {
     XSelectInput(display, window, ExposureMask | KeyPressMask);
     XMapWindow(display, window);
 
+    auto image = imlib_load_image("image.jpg");
+    assert(image && "failed to open image");
+    imlib_context_set_image(image);
+    imlib_context_set_display(display);
+    imlib_context_set_visual(DefaultVisual(display, screen));
+    imlib_context_set_drawable(window);
+
     return (App){
         .display = display,
         .window = window,
@@ -35,7 +43,9 @@ static App app_new(void) {
     };
 }
 
-static void render(App const *app) {}
+static void render(App const *app) {
+    imlib_render_image_on_drawable(0, 0);
+}
 
 static void handle_key_press(App *app, XKeyEvent *event) {
     auto key = XLookupKeysym(event, 0);
@@ -60,6 +70,7 @@ static void app_run(App *app) {
 static void app_deinit(App const *app) {
     XDestroyWindow(app->display, app->window);
     XCloseDisplay(app->display);
+    imlib_free_image();
 }
 
 int main(void) {

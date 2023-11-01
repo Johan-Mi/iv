@@ -5,6 +5,7 @@ Image viewer for X11.
 ## Dependencies
 
 - X11
+- Imlib 2
 
 ## Build instructions
 

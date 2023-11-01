@@ -1,5 +1,5 @@
 override CFLAGS += -Wall -Wextra -Wpedantic -Wconversion -Wno-keyword-macro -Wno-gnu-auto-type
-override LDLIBS += -lX11
+override LDLIBS += -lImlib2 -lX11
 
 all: main
 .PHONY: all
