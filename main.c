@@ -1,5 +1,5 @@
 #include <Imlib2.h>
-#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <assert.h>
 #include <stdbool.h>
@@ -99,7 +99,8 @@ static void render_all_updates(App const *app, Imlib_Updates updates) {
 }
 
 static void handle_key_press(App *app, XKeyEvent *event) {
-    auto key = XLookupKeysym(event, 0);
+    KeySym key = 0;
+    XLookupString(event, NULL, 0, &key, NULL);
     switch (key) {
     case XK_q:
         app->quit = true;
