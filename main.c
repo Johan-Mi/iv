@@ -36,6 +36,7 @@ typedef struct {
     Display *display;
     Window window;
     int window_width, window_height;
+    Atom atom_wm_delete_window;
     float zoom_level;
     bool dirty;
     bool quit;
@@ -66,11 +67,15 @@ static App app_new(char const *image_path) {
     imlib_context_set_visual(DefaultVisual(display, screen));
     imlib_context_set_drawable(window);
 
+    auto atom_wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", 0);
+    XSetWMProtocols(display, window, &atom_wm_delete_window, 1);
+
     return (App){
         .display = display,
         .window = window,
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
+        .atom_wm_delete_window = atom_wm_delete_window,
         .zoom_level = 1.0f,
         .dirty = false,
         .quit = false,
@@ -157,6 +162,11 @@ static void app_run(App *app) {
             app->window_width = size.width;
             app->window_height = size.height;
         } break;
+        case ClientMessage:
+            if ((Atom)event.xclient.data.l[0] == app->atom_wm_delete_window) {
+                app->quit = true;
+            }
+            break;
         }
     } while (XPending(app->display));
 
