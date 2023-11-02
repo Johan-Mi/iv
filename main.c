@@ -113,6 +113,10 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         app->zoom_level = larger_zoom(app->zoom_level);
         printf("%d\n", (int)(app->zoom_level * 100.0f));
         break;
+    case XK_equal:
+        app->zoom_level = 1.0f;
+        printf("%d\n", (int)(app->zoom_level * 100.0f));
+        break;
     default:;
     }
 }
