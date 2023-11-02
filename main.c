@@ -3,15 +3,41 @@
 #include <X11/keysym.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
 
 #define auto __auto_type
 
+#define LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600 };
+
+static float const ZOOM_LEVELS[] = {0.125f, 0.25f, 0.75f, 1.0f,  1.5f,
+                                    2.0f,   4.0f,  8.0f,  12.0f, 16.0f};
+
+static float smaller_zoom(float zoom) {
+    for (size_t i = LENGTH(ZOOM_LEVELS); i--;) {
+        if (ZOOM_LEVELS[i] < zoom) {
+            return ZOOM_LEVELS[i];
+        }
+    }
+    return zoom;
+}
+
+static float larger_zoom(float zoom) {
+    for (size_t i = 0; i < LENGTH(ZOOM_LEVELS); ++i) {
+        if (ZOOM_LEVELS[i] > zoom) {
+            return ZOOM_LEVELS[i];
+        }
+    }
+    return zoom;
+}
 
 typedef struct {
     Display *display;
     Window window;
     int window_width, window_height;
+    float zoom_level;
     bool quit;
 } App;
 
@@ -45,6 +71,7 @@ static App app_new(char const *image_path) {
         .window = window,
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
+        .zoom_level = 1.0f,
         .quit = false,
     };
 }
@@ -73,8 +100,19 @@ static void render_all_updates(App const *app, Imlib_Updates updates) {
 
 static void handle_key_press(App *app, XKeyEvent *event) {
     auto key = XLookupKeysym(event, 0);
-    if (key == XK_q) {
+    switch (key) {
+    case XK_q:
         app->quit = true;
+        break;
+    case XK_minus:
+        app->zoom_level = smaller_zoom(app->zoom_level);
+        printf("%d\n", (int)(app->zoom_level * 100.0f));
+        break;
+    case XK_plus:
+        app->zoom_level = larger_zoom(app->zoom_level);
+        printf("%d\n", (int)(app->zoom_level * 100.0f));
+        break;
+    default:;
     }
 }
 
