@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
 
 #define auto __auto_type
 
@@ -109,15 +108,12 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         break;
     case XK_minus:
         app->zoom_level = smaller_zoom(app->zoom_level);
-        printf("%d\n", (int)(app->zoom_level * 100.0f));
         break;
     case XK_plus:
         app->zoom_level = larger_zoom(app->zoom_level);
-        printf("%d\n", (int)(app->zoom_level * 100.0f));
         break;
     case XK_equal:
         app->zoom_level = 1.0f;
-        printf("%d\n", (int)(app->zoom_level * 100.0f));
         break;
     default:;
     }
