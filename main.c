@@ -76,14 +76,16 @@ static App app_new(char const *image_path) {
     };
 }
 
-static void render(Imlib_Updates updates) {
+static void render(App const *app, Imlib_Updates updates) {
     int x = 0;
     int y = 0;
     int width = 0;
     int height = 0;
     imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
+    auto source_width = (int)((float)width / app->zoom_level);
+    auto source_height = (int)((float)height / app->zoom_level);
     imlib_render_image_part_on_drawable_at_size(
-        x, y, width, height, x, y, width, height
+        x, y, source_width, source_height, x, y, width, height
     );
 }
 
@@ -93,7 +95,7 @@ static void render_all_updates(App const *app, Imlib_Updates updates) {
     );
     for (auto update = updates; update;
          update = imlib_updates_get_next(update)) {
-        render(update);
+        render(app, update);
     }
     imlib_updates_free(updates);
 }
