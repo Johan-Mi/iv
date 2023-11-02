@@ -4,6 +4,10 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #define auto __auto_type
 
@@ -173,10 +177,30 @@ static void app_run(App *app) {
     render_all_updates(app, updates);
 }
 
+// lf breaks if it tries to resize really quickly after running a shell command,
+// so we wait a bit.
+static void sleep_to_not_break_lf(void) {
+    auto parent_pid = getppid();
+    char cmdline_path[sizeof("/proc/2147483647/cmdline")];
+    (void)sprintf(cmdline_path, "/proc/%d/cmdline", parent_pid);
+    auto cmdline_file = fopen(cmdline_path, "r");
+    char cmdline[sizeof("lf") - 1] = {0};
+    (void)fread(cmdline, sizeof(cmdline), 1, cmdline_file);
+    (void)fclose(cmdline_file);
+    if (memcmp(cmdline, "lf", sizeof(cmdline)) == 0) {
+        auto const timespec = (struct timespec){
+            .tv_sec = 0,
+            .tv_nsec = 100000000,
+        };
+        nanosleep(&timespec, NULL);
+    }
+}
+
 static void app_deinit(App const *app) {
     XDestroyWindow(app->display, app->window);
     XCloseDisplay(app->display);
     imlib_free_image();
+    sleep_to_not_break_lf();
 }
 
 int main(int argc, char *argv[]) {
