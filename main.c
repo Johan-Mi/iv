@@ -109,6 +109,13 @@ static void render_all_updates(App *app, Imlib_Updates updates) {
     imlib_updates_free(updates);
 }
 
+static void set_zoom_level(App *app, float zoom) {
+    if (app->zoom_level != zoom) {
+        app->zoom_level = zoom;
+        app->dirty = true;
+    }
+}
+
 static void handle_key_press(App *app, XKeyEvent *event) {
     KeySym key = 0;
     XLookupString(event, NULL, 0, &key, NULL);
@@ -117,16 +124,13 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         app->quit = true;
         break;
     case XK_minus:
-        app->zoom_level = smaller_zoom(app->zoom_level);
-        app->dirty = true;
+        set_zoom_level(app, smaller_zoom(app->zoom_level));
         break;
     case XK_plus:
-        app->zoom_level = larger_zoom(app->zoom_level);
-        app->dirty = true;
+        set_zoom_level(app, larger_zoom(app->zoom_level));
         break;
     case XK_equal:
-        app->zoom_level = 1.0f;
-        app->dirty = true;
+        set_zoom_level(app, 1.0f);
         break;
     default:;
     }
