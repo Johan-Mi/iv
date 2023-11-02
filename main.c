@@ -37,6 +37,7 @@ typedef struct {
     Window window;
     int window_width, window_height;
     float zoom_level;
+    bool dirty;
     bool quit;
 } App;
 
@@ -71,6 +72,7 @@ static App app_new(char const *image_path) {
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
         .zoom_level = 1.0f,
+        .dirty = false,
         .quit = false,
     };
 }
@@ -88,10 +90,18 @@ static void render(App const *app, Imlib_Updates updates) {
     );
 }
 
-static void render_all_updates(App const *app, Imlib_Updates updates) {
-    updates = imlib_updates_merge_for_rendering(
-        updates, app->window_width, app->window_height
-    );
+static void render_all_updates(App *app, Imlib_Updates updates) {
+    if (app->dirty) {
+        app->dirty = false;
+        imlib_updates_free(updates);
+        updates = imlib_update_append_rect(
+            NULL, 0, 0, app->window_width, app->window_height
+        );
+    } else {
+        updates = imlib_updates_merge_for_rendering(
+            updates, app->window_width, app->window_height
+        );
+    }
     for (auto update = updates; update;
          update = imlib_updates_get_next(update)) {
         render(app, update);
@@ -108,12 +118,15 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         break;
     case XK_minus:
         app->zoom_level = smaller_zoom(app->zoom_level);
+        app->dirty = true;
         break;
     case XK_plus:
         app->zoom_level = larger_zoom(app->zoom_level);
+        app->dirty = true;
         break;
     case XK_equal:
         app->zoom_level = 1.0f;
+        app->dirty = true;
         break;
     default:;
     }
