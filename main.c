@@ -135,17 +135,23 @@ static void set_zoom_level(App *app, float zoom) {
 }
 
 static void set_pan_x(App *app, int x) {
-    if (x >= 0) {
-        app->pan.x = x;
-        app->dirty = true;
+    if (x < 0 || (float)imlib_image_get_width() * app->zoom_level <=
+                     (float)app->window_width) {
+        return;
     }
+
+    app->pan.x = x;
+    app->dirty = true;
 }
 
 static void set_pan_y(App *app, int y) {
-    if (y >= 0) {
-        app->pan.y = y;
-        app->dirty = true;
+    if (y < 0 || (float)imlib_image_get_height() * app->zoom_level <=
+                     (float)app->window_height) {
+        return;
     }
+
+    app->pan.y = y;
+    app->dirty = true;
 }
 
 static void handle_key_press(App *app, XKeyEvent *event) {
