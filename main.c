@@ -13,7 +13,7 @@
 
 #define LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600 };
+enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600, PAN_AMOUNT = 50 };
 
 static float const ZOOM_LEVELS[] = {0.125f, 0.25f, 0.75f, 1.0f,  1.5f,
                                     2.0f,   4.0f,  8.0f,  12.0f, 16.0f};
@@ -42,6 +42,9 @@ typedef struct {
     int window_width, window_height;
     Atom atom_wm_delete_window;
     float zoom_level;
+    struct {
+        int x, y;
+    } pan;
     bool dirty;
     bool quit;
 } App;
@@ -81,6 +84,11 @@ static App app_new(char const *image_path) {
         .window_height = DEFAULT_HEIGHT,
         .atom_wm_delete_window = atom_wm_delete_window,
         .zoom_level = 1.0f,
+        .pan =
+            {
+                .x = 0,
+                .y = 0,
+            },
         .dirty = false,
         .quit = false,
     };
@@ -95,7 +103,8 @@ static void render(App const *app, Imlib_Updates updates) {
     auto source_width = (int)((float)width / app->zoom_level);
     auto source_height = (int)((float)height / app->zoom_level);
     imlib_render_image_part_on_drawable_at_size(
-        x, y, source_width, source_height, x, y, width, height
+        x + app->pan.x, y + app->pan.y, source_width, source_height, x, y,
+        width, height
     );
 }
 
@@ -125,6 +134,16 @@ static void set_zoom_level(App *app, float zoom) {
     }
 }
 
+static void set_pan_x(App *app, int x) {
+    app->pan.x = x;
+    app->dirty = true;
+}
+
+static void set_pan_y(App *app, int y) {
+    app->pan.y = y;
+    app->dirty = true;
+}
+
 static void handle_key_press(App *app, XKeyEvent *event) {
     KeySym key = 0;
     XLookupString(event, NULL, 0, &key, NULL);
@@ -140,6 +159,18 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         break;
     case XK_equal:
         set_zoom_level(app, 1.0f);
+        break;
+    case XK_h:
+        set_pan_x(app, app->pan.x - PAN_AMOUNT);
+        break;
+    case XK_l:
+        set_pan_x(app, app->pan.x + PAN_AMOUNT);
+        break;
+    case XK_k:
+        set_pan_y(app, app->pan.y - PAN_AMOUNT);
+        break;
+    case XK_j:
+        set_pan_y(app, app->pan.y + PAN_AMOUNT);
         break;
     default:;
     }
