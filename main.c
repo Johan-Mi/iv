@@ -197,8 +197,15 @@ static int clamp_pan_x(App const *app, int x) {
                                                : x;
 }
 
-static int clamp_pan_y(int y) {
-    return y < 0 ? 0 : y;
+static int clamp_pan_y(App const *app, int y) {
+    if (y < 0) {
+        return 0;
+    }
+    auto image_height =
+        (int)((float)imlib_image_get_height() * app->zoom.level);
+    return y > image_height - app->window_height
+               ? image_height - app->window_height
+               : y;
 }
 
 static void set_pan_x(App *app, int x) {
@@ -217,7 +224,7 @@ static void set_pan_y(App *app, int y) {
         return;
     }
 
-    app->pan.y = clamp_pan_y(y);
+    app->pan.y = clamp_pan_y(app, y);
     app->dirty = true;
 }
 
