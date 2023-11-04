@@ -319,7 +319,11 @@ static void app_deinit(App const *app) {
 }
 
 int main(int argc, char *argv[]) {
-    auto image_path = argc > 1 ? argv[1] : "image.jpg";
+    if (argc < 2) {
+        (void)fputs("error: no images provided\n", stderr);
+        return EXIT_FAILURE;
+    }
+    auto image_path = argv[1];
 
     auto app = app_new(image_path);
     while (!app.quit) {
