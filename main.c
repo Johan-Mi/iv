@@ -210,6 +210,10 @@ static void handle_key_press(App *app, XKeyEvent *event) {
     case XK_j:
         set_pan_y(app, app->pan.y + app->window_height / PAN_AMOUNT);
         break;
+    case XK_a:
+        imlib_context_set_anti_alias(imlib_context_get_anti_alias() ? 0 : 1);
+        app->dirty = true;
+        break;
     default:;
     }
 }
