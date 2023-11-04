@@ -188,8 +188,13 @@ static void set_zoom_level(App *app, float level) {
     app->zoom.mode = ZoomManual;
 }
 
-static int clamp_pan_x(int x) {
-    return x < 0 ? 0 : x;
+static int clamp_pan_x(App const *app, int x) {
+    if (x < 0) {
+        return 0;
+    }
+    auto image_width = (int)((float)imlib_image_get_width() * app->zoom.level);
+    return x > image_width - app->window_width ? image_width - app->window_width
+                                               : x;
 }
 
 static int clamp_pan_y(int y) {
@@ -202,7 +207,7 @@ static void set_pan_x(App *app, int x) {
         return;
     }
 
-    app->pan.x = clamp_pan_x(x);
+    app->pan.x = clamp_pan_x(app, x);
     app->dirty = true;
 }
 
