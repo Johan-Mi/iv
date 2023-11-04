@@ -147,7 +147,7 @@ clip_image_left(App const *app, int *x, int y, int *width, int height) {
 static void
 clip_image_bottom(App const *app, int x, int y, int width, int *height) {
     auto edge =
-        (int)((float)(imlib_image_get_height() - app->pan.y) * app->zoom.level);
+        (int)((float)imlib_image_get_height() * app->zoom.level) - app->pan.y;
     if (edge < app->window_height) {
         auto background_height = y > edge ? *height : y + *height - edge;
         render_background(
@@ -160,7 +160,7 @@ clip_image_bottom(App const *app, int x, int y, int width, int *height) {
 static void
 clip_image_right(App const *app, int x, int y, int *width, int height) {
     auto edge =
-        (int)((float)(imlib_image_get_width() - app->pan.x) * app->zoom.level);
+        (int)((float)imlib_image_get_width() * app->zoom.level) - app->pan.x;
     if (edge < app->window_width) {
         auto background_width = x > edge ? *width : x + *width - edge;
         render_background(
