@@ -1,4 +1,5 @@
 #include <Imlib2.h>
+#include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <assert.h>
@@ -107,15 +108,22 @@ static App app_new(char const *image_path) {
     };
 }
 
+static void render_background(
+    App const *app, int x, int y, unsigned width, unsigned height
+) {
+    XFillRectangle(app->display, app->window, app->gc, x, y, width, height);
+}
+
 static void
-render_background(App const *app, int x, int y, int width, int height) {
-    auto pan_y = -app->pan.y;
-    if (y < pan_y) {
-        auto background_height = y + height > pan_y ? pan_y - y : height;
-        XFillRectangle(
-            app->display, app->window, app->gc, x, y, (unsigned)width,
-            (unsigned)background_height
+clip_image_top(App const *app, int x, int *y, int width, int *height) {
+    if (*y < -app->pan.y) {
+        auto background_height =
+            *y + *height > -app->pan.y ? -app->pan.y - *y : *height;
+        render_background(
+            app, x, *y, (unsigned)width, (unsigned)background_height
         );
+        *height += app->pan.y + *y;
+        *y = -app->pan.y;
     }
 }
 
@@ -125,6 +133,7 @@ static void render(App const *app, Imlib_Updates updates) {
     int width = 0;
     int height = 0;
     imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
+    clip_image_top(app, x, &y, width, &height);
     auto source_width = (int)((float)width / app->zoom.level);
     auto source_height = (int)((float)height / app->zoom.level);
     auto source_x = x + (int)((float)app->pan.x * app->zoom.level);
@@ -132,7 +141,6 @@ static void render(App const *app, Imlib_Updates updates) {
     imlib_render_image_part_on_drawable_at_size(
         source_x, source_y, source_width, source_height, x, y, width, height
     );
-    render_background(app, x, y, width, height);
 }
 
 static void render_all_updates(App *app, Imlib_Updates updates) {
