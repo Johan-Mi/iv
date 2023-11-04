@@ -61,7 +61,7 @@ typedef struct {
 static App app_new(char const *image_path) {
     auto display = XOpenDisplay(NULL);
     if (!display) {
-        (void)fputs("error: failed to open display", stderr);
+        (void)fputs("error: failed to open display\n", stderr);
         exit(EXIT_FAILURE);
     }
 
