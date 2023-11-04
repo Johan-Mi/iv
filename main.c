@@ -127,6 +127,19 @@ clip_image_top(App const *app, int x, int *y, int width, int *height) {
     }
 }
 
+static void
+clip_image_left(App const *app, int *x, int y, int *width, int height) {
+    if (*x < -app->pan.x) {
+        auto background_width =
+            *x + *width > -app->pan.x ? -app->pan.x - *x : *width;
+        render_background(
+            app, *x, y, (unsigned)background_width, (unsigned)height
+        );
+        *width += app->pan.x + *x;
+        *x = -app->pan.x;
+    }
+}
+
 static void render(App const *app, Imlib_Updates updates) {
     int x = 0;
     int y = 0;
@@ -134,6 +147,7 @@ static void render(App const *app, Imlib_Updates updates) {
     int height = 0;
     imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
     clip_image_top(app, x, &y, width, &height);
+    clip_image_left(app, &x, y, &width, height);
     auto source_width = (int)((float)width / app->zoom.level);
     auto source_height = (int)((float)height / app->zoom.level);
     auto source_x = x + (int)((float)app->pan.x * app->zoom.level);
