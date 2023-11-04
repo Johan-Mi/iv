@@ -43,6 +43,7 @@ typedef enum {
 typedef struct {
     Display *display;
     Window window;
+    GC gc;
     int window_width, window_height;
     Atom atom_wm_delete_window;
     struct {
@@ -87,6 +88,7 @@ static App app_new(char const *image_path) {
     return (App){
         .display = display,
         .window = window,
+        .gc = DefaultGC(display, screen),
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
         .atom_wm_delete_window = atom_wm_delete_window,
@@ -105,6 +107,18 @@ static App app_new(char const *image_path) {
     };
 }
 
+static void
+render_background(App const *app, int x, int y, int width, int height) {
+    auto pan_y = (int)(-(float)app->pan.y * app->zoom.level);
+    if (y < pan_y) {
+        auto background_height = y + height > pan_y ? pan_y - y : height;
+        XFillRectangle(
+            app->display, app->window, app->gc, x, y, (unsigned)width,
+            (unsigned)background_height
+        );
+    }
+}
+
 static void render(App const *app, Imlib_Updates updates) {
     int x = 0;
     int y = 0;
@@ -117,6 +131,7 @@ static void render(App const *app, Imlib_Updates updates) {
         x + app->pan.x, y + app->pan.y, source_width, source_height, x, y,
         width, height
     );
+    render_background(app, x, y, width, height);
 }
 
 static void render_all_updates(App *app, Imlib_Updates updates) {
