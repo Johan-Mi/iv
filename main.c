@@ -184,16 +184,21 @@ static void set_zoom_level(App *app, float level) {
     app->zoom.mode = ZoomManual;
 }
 
+static int clamp_pan_x(int x) {
+    return x < 0 ? 0 : x;
+}
+
+static int clamp_pan_y(int y) {
+    return y < 0 ? 0 : y;
+}
+
 static void set_pan_x(App *app, int x) {
     if ((float)imlib_image_get_width() * app->zoom.level <=
         (float)app->window_width) {
         return;
     }
 
-    if (x < 0) {
-        x = 0;
-    }
-    app->pan.x = x;
+    app->pan.x = clamp_pan_x(x);
     app->dirty = true;
 }
 
@@ -203,10 +208,7 @@ static void set_pan_y(App *app, int y) {
         return;
     }
 
-    if (y < 0) {
-        y = 0;
-    }
-    app->pan.y = y;
+    app->pan.y = clamp_pan_y(y);
     app->dirty = true;
 }
 
