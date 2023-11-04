@@ -208,9 +208,28 @@ static void render_all_updates(App *app, Imlib_Updates updates) {
     imlib_updates_free(updates);
 }
 
+static void center_image(App *app) {
+    if ((int)((float)imlib_image_get_width() * app->zoom.level) <
+        app->window_width) {
+        app->pan.x = ((int)((float)imlib_image_get_width() * app->zoom.level) -
+                      app->window_width) /
+                     2;
+        app->dirty = true;
+    }
+
+    if ((int)((float)imlib_image_get_height() * app->zoom.level) <
+        app->window_height) {
+        app->pan.y = ((int)((float)imlib_image_get_height() * app->zoom.level) -
+                      app->window_height) /
+                     2;
+        app->dirty = true;
+    }
+}
+
 static void set_zoom_level(App *app, float level) {
     if (app->zoom.level != level) {
         app->zoom.level = level;
+        center_image(app);
         app->dirty = true;
     }
     app->zoom.mode = ZoomManual;
@@ -318,6 +337,7 @@ static void app_run(App *app) {
             auto size = event.xconfigure;
             app->window_width = size.width;
             app->window_height = size.height;
+            center_image(app);
         } break;
         case ClientMessage:
             if ((Atom)event.xclient.data.l[0] == app->atom_wm_delete_window) {
