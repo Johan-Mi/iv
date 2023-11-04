@@ -40,11 +40,6 @@ typedef enum {
 } ZoomMode;
 
 typedef struct {
-    Display *display;
-    Window window;
-    GC gc;
-    int window_width, window_height;
-    Atom atom_wm_delete_window;
     struct {
         int x, y;
     } pan;
@@ -52,6 +47,15 @@ typedef struct {
         float level;
         ZoomMode mode;
     } zoom;
+} Image;
+
+typedef struct {
+    Display *display;
+    Window window;
+    GC gc;
+    int window_width, window_height;
+    Atom atom_wm_delete_window;
+    Image img;
     bool dirty;
     bool quit;
 } App;
@@ -90,13 +94,7 @@ static App app_new(char const *image_path) {
     auto atom_wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", 0);
     XSetWMProtocols(display, window, &atom_wm_delete_window, 1);
 
-    return (App){
-        .display = display,
-        .window = window,
-        .gc = DefaultGC(display, screen),
-        .window_width = DEFAULT_WIDTH,
-        .window_height = DEFAULT_HEIGHT,
-        .atom_wm_delete_window = atom_wm_delete_window,
+    auto img = (Image){
         .zoom =
             {
                 .level = 1.0f,
@@ -107,6 +105,15 @@ static App app_new(char const *image_path) {
                 .x = 0,
                 .y = 0,
             },
+    };
+    return (App){
+        .display = display,
+        .window = window,
+        .gc = DefaultGC(display, screen),
+        .window_width = DEFAULT_WIDTH,
+        .window_height = DEFAULT_HEIGHT,
+        .atom_wm_delete_window = atom_wm_delete_window,
+        .img = img,
         .dirty = false,
         .quit = false,
     };
@@ -120,34 +127,37 @@ static void render_background(
 
 static void
 clip_image_top(App const *app, int x, int *y, int width, int *height) {
-    if (*y < -app->pan.y) {
+    auto img = &app->img;
+    if (*y < -img->pan.y) {
         auto background_height =
-            *y + *height > -app->pan.y ? -app->pan.y - *y : *height;
+            *y + *height > -img->pan.y ? -img->pan.y - *y : *height;
         render_background(
             app, x, *y, (unsigned)width, (unsigned)background_height
         );
-        *height += app->pan.y + *y;
-        *y = -app->pan.y;
+        *height += img->pan.y + *y;
+        *y = -img->pan.y;
     }
 }
 
 static void
 clip_image_left(App const *app, int *x, int y, int *width, int height) {
-    if (*x < -app->pan.x) {
+    auto img = &app->img;
+    if (*x < -img->pan.x) {
         auto background_width =
-            *x + *width > -app->pan.x ? -app->pan.x - *x : *width;
+            *x + *width > -img->pan.x ? -img->pan.x - *x : *width;
         render_background(
             app, *x, y, (unsigned)background_width, (unsigned)height
         );
-        *width += app->pan.x + *x;
-        *x = -app->pan.x;
+        *width += img->pan.x + *x;
+        *x = -img->pan.x;
     }
 }
 
 static void
 clip_image_bottom(App const *app, int x, int y, int width, int *height) {
+    auto img = &app->img;
     auto edge =
-        (int)((float)imlib_image_get_height() * app->zoom.level) - app->pan.y;
+        (int)((float)imlib_image_get_height() * img->zoom.level) - img->pan.y;
     if (edge < app->window_height) {
         auto background_height = y > edge ? *height : y + *height - edge;
         render_background(
@@ -159,8 +169,9 @@ clip_image_bottom(App const *app, int x, int y, int width, int *height) {
 
 static void
 clip_image_right(App const *app, int x, int y, int *width, int height) {
+    auto img = &app->img;
     auto edge =
-        (int)((float)imlib_image_get_width() * app->zoom.level) - app->pan.x;
+        (int)((float)imlib_image_get_width() * img->zoom.level) - img->pan.x;
     if (edge < app->window_width) {
         auto background_width = x > edge ? *width : x + *width - edge;
         render_background(
@@ -171,6 +182,7 @@ clip_image_right(App const *app, int x, int y, int *width, int height) {
 }
 
 static void render(App const *app, Imlib_Updates updates) {
+    auto img = &app->img;
     int x = 0;
     int y = 0;
     int width = 0;
@@ -180,10 +192,10 @@ static void render(App const *app, Imlib_Updates updates) {
     clip_image_left(app, &x, y, &width, height);
     clip_image_bottom(app, x, y, width, &height);
     clip_image_right(app, x, y, &width, height);
-    auto source_width = (int)((float)width / app->zoom.level);
-    auto source_height = (int)((float)height / app->zoom.level);
-    auto source_x = (int)((float)(x + app->pan.x) / app->zoom.level);
-    auto source_y = (int)((float)(y + app->pan.y) / app->zoom.level);
+    auto source_width = (int)((float)width / img->zoom.level);
+    auto source_height = (int)((float)height / img->zoom.level);
+    auto source_x = (int)((float)(x + img->pan.x) / img->zoom.level);
+    auto source_y = (int)((float)(y + img->pan.y) / img->zoom.level);
     imlib_render_image_part_on_drawable_at_size(
         source_x, source_y, source_width, source_height, x, y, width, height
     );
@@ -209,17 +221,18 @@ static void render_all_updates(App *app, Imlib_Updates updates) {
 }
 
 static void center_image(App *app) {
-    if ((int)((float)imlib_image_get_width() * app->zoom.level) <
+    auto img = &app->img;
+    if ((int)((float)imlib_image_get_width() * img->zoom.level) <
         app->window_width) {
-        app->pan.x = ((int)((float)imlib_image_get_width() * app->zoom.level) -
+        img->pan.x = ((int)((float)imlib_image_get_width() * img->zoom.level) -
                       app->window_width) /
                      2;
         app->dirty = true;
     }
 
-    if ((int)((float)imlib_image_get_height() * app->zoom.level) <
+    if ((int)((float)imlib_image_get_height() * img->zoom.level) <
         app->window_height) {
-        app->pan.y = ((int)((float)imlib_image_get_height() * app->zoom.level) -
+        img->pan.y = ((int)((float)imlib_image_get_height() * img->zoom.level) -
                       app->window_height) /
                      2;
         app->dirty = true;
@@ -227,19 +240,21 @@ static void center_image(App *app) {
 }
 
 static void set_zoom_level(App *app, float level) {
-    if (app->zoom.level != level) {
-        app->zoom.level = level;
+    auto img = &app->img;
+    if (img->zoom.level != level) {
+        img->zoom.level = level;
         center_image(app);
         app->dirty = true;
     }
-    app->zoom.mode = ZoomManual;
+    img->zoom.mode = ZoomManual;
 }
 
 static int clamp_pan_x(App const *app, int x) {
     if (x < 0) {
         return 0;
     }
-    auto image_width = (int)((float)imlib_image_get_width() * app->zoom.level);
+    auto image_width =
+        (int)((float)imlib_image_get_width() * app->img.zoom.level);
     return x > image_width - app->window_width ? image_width - app->window_width
                                                : x;
 }
@@ -249,29 +264,29 @@ static int clamp_pan_y(App const *app, int y) {
         return 0;
     }
     auto image_height =
-        (int)((float)imlib_image_get_height() * app->zoom.level);
+        (int)((float)imlib_image_get_height() * app->img.zoom.level);
     return y > image_height - app->window_height
                ? image_height - app->window_height
                : y;
 }
 
 static void set_pan_x(App *app, int x) {
-    if ((float)imlib_image_get_width() * app->zoom.level <=
+    if ((float)imlib_image_get_width() * app->img.zoom.level <=
         (float)app->window_width) {
         return;
     }
 
-    app->pan.x = clamp_pan_x(app, x);
+    app->img.pan.x = clamp_pan_x(app, x);
     app->dirty = true;
 }
 
 static void set_pan_y(App *app, int y) {
-    if ((float)imlib_image_get_height() * app->zoom.level <=
+    if ((float)imlib_image_get_height() * app->img.zoom.level <=
         (float)app->window_height) {
         return;
     }
 
-    app->pan.y = clamp_pan_y(app, y);
+    app->img.pan.y = clamp_pan_y(app, y);
     app->dirty = true;
 }
 
@@ -283,25 +298,25 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         app->quit = true;
         break;
     case XK_minus:
-        set_zoom_level(app, smaller_zoom(app->zoom.level));
+        set_zoom_level(app, smaller_zoom(app->img.zoom.level));
         break;
     case XK_plus:
-        set_zoom_level(app, larger_zoom(app->zoom.level));
+        set_zoom_level(app, larger_zoom(app->img.zoom.level));
         break;
     case XK_equal:
         set_zoom_level(app, 1.0f);
         break;
     case XK_h:
-        set_pan_x(app, app->pan.x - app->window_width / PAN_AMOUNT);
+        set_pan_x(app, app->img.pan.x - app->window_width / PAN_AMOUNT);
         break;
     case XK_l:
-        set_pan_x(app, app->pan.x + app->window_width / PAN_AMOUNT);
+        set_pan_x(app, app->img.pan.x + app->window_width / PAN_AMOUNT);
         break;
     case XK_k:
-        set_pan_y(app, app->pan.y - app->window_height / PAN_AMOUNT);
+        set_pan_y(app, app->img.pan.y - app->window_height / PAN_AMOUNT);
         break;
     case XK_j:
-        set_pan_y(app, app->pan.y + app->window_height / PAN_AMOUNT);
+        set_pan_y(app, app->img.pan.y + app->window_height / PAN_AMOUNT);
         break;
     case XK_H:
         set_pan_x(app, 0);
