@@ -18,33 +18,40 @@ enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600, PAN_AMOUNT = 50 };
 static float const ZOOM_LEVELS[] = {0.125f, 0.25f, 0.75f, 1.0f,  1.5f,
                                     2.0f,   4.0f,  8.0f,  12.0f, 16.0f};
 
-static float smaller_zoom(float zoom) {
+static float smaller_zoom(float level) {
     for (size_t i = LENGTH(ZOOM_LEVELS); i--;) {
-        if (ZOOM_LEVELS[i] < zoom) {
+        if (ZOOM_LEVELS[i] < level) {
             return ZOOM_LEVELS[i];
         }
     }
-    return zoom;
+    return level;
 }
 
-static float larger_zoom(float zoom) {
+static float larger_zoom(float level) {
     for (size_t i = 0; i < LENGTH(ZOOM_LEVELS); ++i) {
-        if (ZOOM_LEVELS[i] > zoom) {
+        if (ZOOM_LEVELS[i] > level) {
             return ZOOM_LEVELS[i];
         }
     }
-    return zoom;
+    return level;
 }
+
+typedef enum {
+    ZoomManual,
+} ZoomMode;
 
 typedef struct {
     Display *display;
     Window window;
     int window_width, window_height;
     Atom atom_wm_delete_window;
-    float zoom_level;
     struct {
         int x, y;
     } pan;
+    struct {
+        float level;
+        ZoomMode mode;
+    } zoom;
     bool dirty;
     bool quit;
 } App;
@@ -83,7 +90,11 @@ static App app_new(char const *image_path) {
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
         .atom_wm_delete_window = atom_wm_delete_window,
-        .zoom_level = 1.0f,
+        .zoom =
+            {
+                .level = 1.0f,
+                .mode = ZoomManual,
+            },
         .pan =
             {
                 .x = 0,
@@ -100,8 +111,8 @@ static void render(App const *app, Imlib_Updates updates) {
     int width = 0;
     int height = 0;
     imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
-    auto source_width = (int)((float)width / app->zoom_level);
-    auto source_height = (int)((float)height / app->zoom_level);
+    auto source_width = (int)((float)width / app->zoom.level);
+    auto source_height = (int)((float)height / app->zoom.level);
     imlib_render_image_part_on_drawable_at_size(
         x + app->pan.x, y + app->pan.y, source_width, source_height, x, y,
         width, height
@@ -127,15 +138,16 @@ static void render_all_updates(App *app, Imlib_Updates updates) {
     imlib_updates_free(updates);
 }
 
-static void set_zoom_level(App *app, float zoom) {
-    if (app->zoom_level != zoom) {
-        app->zoom_level = zoom;
+static void set_zoom_level(App *app, float level) {
+    if (app->zoom.level != level) {
+        app->zoom.level = level;
         app->dirty = true;
     }
+    app->zoom.mode = ZoomManual;
 }
 
 static void set_pan_x(App *app, int x) {
-    if (x < 0 || (float)imlib_image_get_width() * app->zoom_level <=
+    if (x < 0 || (float)imlib_image_get_width() * app->zoom.level <=
                      (float)app->window_width) {
         return;
     }
@@ -145,7 +157,7 @@ static void set_pan_x(App *app, int x) {
 }
 
 static void set_pan_y(App *app, int y) {
-    if (y < 0 || (float)imlib_image_get_height() * app->zoom_level <=
+    if (y < 0 || (float)imlib_image_get_height() * app->zoom.level <=
                      (float)app->window_height) {
         return;
     }
@@ -162,10 +174,10 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         app->quit = true;
         break;
     case XK_minus:
-        set_zoom_level(app, smaller_zoom(app->zoom_level));
+        set_zoom_level(app, smaller_zoom(app->zoom.level));
         break;
     case XK_plus:
-        set_zoom_level(app, larger_zoom(app->zoom_level));
+        set_zoom_level(app, larger_zoom(app->zoom.level));
         break;
     case XK_equal:
         set_zoom_level(app, 1.0f);
