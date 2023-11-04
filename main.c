@@ -425,6 +425,7 @@ static Images load_images(size_t argc, char *argv[]) {
 
     if (image_count == 0) {
         (void)fprintf(stderr, "error: failed to open all images\n");
+        free(images);
         exit(EXIT_FAILURE);
     }
 
