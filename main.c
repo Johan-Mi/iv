@@ -150,8 +150,8 @@ static void render(App const *app, Imlib_Updates updates) {
     clip_image_left(app, &x, y, &width, height);
     auto source_width = (int)((float)width / app->zoom.level);
     auto source_height = (int)((float)height / app->zoom.level);
-    auto source_x = x + (int)((float)app->pan.x * app->zoom.level);
-    auto source_y = y + (int)((float)app->pan.y * app->zoom.level);
+    auto source_x = (int)((float)(x + app->pan.x) / app->zoom.level);
+    auto source_y = (int)((float)(y + app->pan.y) / app->zoom.level);
     imlib_render_image_part_on_drawable_at_size(
         source_x, source_y, source_width, source_height, x, y, width, height
     );
