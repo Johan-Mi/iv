@@ -157,6 +157,19 @@ clip_image_bottom(App const *app, int x, int y, int width, int *height) {
     }
 }
 
+static void
+clip_image_right(App const *app, int x, int y, int *width, int height) {
+    auto edge =
+        (int)((float)(imlib_image_get_width() - app->pan.x) * app->zoom.level);
+    if (edge < app->window_width) {
+        auto background_width = x > edge ? *width : x + *width - edge;
+        render_background(
+            app, edge, y, (unsigned)background_width, (unsigned)height
+        );
+        *width = edge - x;
+    }
+}
+
 static void render(App const *app, Imlib_Updates updates) {
     int x = 0;
     int y = 0;
@@ -166,6 +179,7 @@ static void render(App const *app, Imlib_Updates updates) {
     clip_image_top(app, x, &y, width, &height);
     clip_image_left(app, &x, y, &width, height);
     clip_image_bottom(app, x, y, width, &height);
+    clip_image_right(app, x, y, &width, height);
     auto source_width = (int)((float)width / app->zoom.level);
     auto source_height = (int)((float)height / app->zoom.level);
     auto source_x = (int)((float)(x + app->pan.x) / app->zoom.level);
