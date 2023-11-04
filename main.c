@@ -13,7 +13,7 @@
 
 #define LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600, PAN_AMOUNT = 50 };
+enum { DEFAULT_WIDTH = 800, DEFAULT_HEIGHT = 600, PAN_AMOUNT = 5 };
 
 static float const ZOOM_LEVELS[] = {0.125f, 0.25f, 0.75f, 1.0f,  1.5f,
                                     2.0f,   4.0f,  8.0f,  12.0f, 16.0f};
@@ -109,7 +109,7 @@ static App app_new(char const *image_path) {
 
 static void
 render_background(App const *app, int x, int y, int width, int height) {
-    auto pan_y = (int)(-(float)app->pan.y * app->zoom.level);
+    auto pan_y = -app->pan.y;
     if (y < pan_y) {
         auto background_height = y + height > pan_y ? pan_y - y : height;
         XFillRectangle(
@@ -127,9 +127,10 @@ static void render(App const *app, Imlib_Updates updates) {
     imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
     auto source_width = (int)((float)width / app->zoom.level);
     auto source_height = (int)((float)height / app->zoom.level);
+    auto source_x = x + (int)((float)app->pan.x * app->zoom.level);
+    auto source_y = y + (int)((float)app->pan.y * app->zoom.level);
     imlib_render_image_part_on_drawable_at_size(
-        x + app->pan.x, y + app->pan.y, source_width, source_height, x, y,
-        width, height
+        source_x, source_y, source_width, source_height, x, y, width, height
     );
     render_background(app, x, y, width, height);
 }
@@ -198,16 +199,16 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         set_zoom_level(app, 1.0f);
         break;
     case XK_h:
-        set_pan_x(app, app->pan.x - PAN_AMOUNT);
+        set_pan_x(app, app->pan.x - app->window_width / PAN_AMOUNT);
         break;
     case XK_l:
-        set_pan_x(app, app->pan.x + PAN_AMOUNT);
+        set_pan_x(app, app->pan.x + app->window_width / PAN_AMOUNT);
         break;
     case XK_k:
-        set_pan_y(app, app->pan.y - PAN_AMOUNT);
+        set_pan_y(app, app->pan.y - app->window_height / PAN_AMOUNT);
         break;
     case XK_j:
-        set_pan_y(app, app->pan.y + PAN_AMOUNT);
+        set_pan_y(app, app->pan.y + app->window_height / PAN_AMOUNT);
         break;
     default:;
     }
