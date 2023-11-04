@@ -2,10 +2,10 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
-#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -60,7 +60,10 @@ typedef struct {
 
 static App app_new(char const *image_path) {
     auto display = XOpenDisplay(NULL);
-    assert(display && "failed to open display");
+    if (!display) {
+        (void)fputs("error: failed to open display", stderr);
+        exit(EXIT_FAILURE);
+    }
 
     auto screen = DefaultScreen(display);
     auto root = RootWindow(display, screen);
@@ -77,7 +80,10 @@ static App app_new(char const *image_path) {
     XMapWindow(display, window);
 
     auto image = imlib_load_image(image_path);
-    assert(image && "failed to open image");
+    if (!image) {
+        (void)fprintf(stderr, "error: failed to open image %s\n", image_path);
+        exit(EXIT_FAILURE);
+    }
     imlib_context_set_image(image);
     imlib_context_set_display(display);
     imlib_context_set_visual(DefaultVisual(display, screen));
