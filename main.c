@@ -303,7 +303,7 @@ static void set_pan_y(App *app, int y) {
 
 static void switch_image(App *app, int offset) {
     auto index = (size_t)(app->img - app->images.items + offset);
-    if (index < 0 || index >= app->images.count) {
+    if (index >= app->images.count) {
         return;
     }
     app->img = &app->images.items[index];
