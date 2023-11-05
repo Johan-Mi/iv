@@ -208,6 +208,14 @@ static void render(App const *app, Imlib_Updates updates) {
         (int)(((float)(y + img->pan.y) - (float)app->window_height / 2) /
               img->zoom.level) +
         imlib_image_get_height() / 2;
+    if (source_width < 0) {
+        (void)fputs("warning: source_width < 0\n", stderr);
+        return;
+    }
+    if (source_height < 0) {
+        (void)fputs("warning: source_height < 0\n", stderr);
+        return;
+    }
     imlib_render_image_part_on_drawable_at_size(
         source_x, source_y, source_width, source_height, x, y, width, height
     );
