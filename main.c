@@ -335,6 +335,12 @@ static void handle_key_press(App *app, XKeyEvent *event) {
                 2
         );
         break;
+    case XK_L:
+        set_pan_x(
+            app,
+            (rendered_image_width(app->img->zoom.level) - app->window_width) / 2
+        );
+        break;
     case XK_a:
         imlib_context_set_anti_alias(imlib_context_get_anti_alias() ? 0 : 1);
         app->dirty = true;
