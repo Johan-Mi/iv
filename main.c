@@ -1,3 +1,5 @@
+#include <GL/glew.h>
+#include <GL/glx.h>
 #include <Imlib2.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -64,9 +66,76 @@ typedef struct {
     Atom atom_wm_delete_window;
     Image *img;
     Images images;
+    GLuint shader_program;
     bool dirty;
     bool quit;
 } App;
+
+static char const *const vertex_source = "#version 150 core\n\
+    in vec2 position;\n\
+    out vec2 texcoord;\n\
+    uniform vec2 pan;\n\
+    uniform vec2 zoom;\n\
+    void main() {\n\
+        texcoord = (position * vec2(-1.0, 1.0) + vec2(1.0)) / 2.0;\n\
+        gl_Position = vec4(-position * zoom + pan, 0.0, 1.0);\n\
+    }";
+
+static char const *const fragment_source = "#version 150 core\n\
+    in vec2 texcoord;\n\
+    out vec4 color;\n\
+    uniform sampler2D tex;\n\
+    void main() {\n\
+        color = texture(tex, texcoord).bgra;\n\
+    }";
+
+static GLuint set_up_opengl(Images *const images) {
+    glewInit();
+
+    float vertices[] = {-1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f,
+                        +1.0f, +1.0f, -1.0f, +1.0f, -1.0f, -1.0f};
+    GLuint vbo = 0;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    auto vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_source, NULL);
+    glCompileShader(vertex_shader);
+
+    auto fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_source, NULL);
+    glCompileShader(fragment_shader);
+
+    auto shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+
+    GLuint tex = 0;
+    glGenTextures((GLsizei)images->count, &tex);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glUniform1i(glGetUniformLocation(shader_program, "tex"), 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFragDataLocation(shader_program, 0, "color");
+
+    glLinkProgram(shader_program);
+    glUseProgram(shader_program);
+
+    auto position = glGetAttribLocation(shader_program, "position");
+    glVertexAttribPointer(
+        position, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0
+    );
+    glEnableVertexAttribArray(position);
+
+    glClearColor(0, 0, 0, 1);
+
+    return shader_program;
+}
 
 static App app_new(Images images) {
     auto display = XOpenDisplay(NULL);
@@ -78,21 +147,32 @@ static App app_new(Images images) {
     auto screen = DefaultScreen(display);
     auto root = RootWindow(display, screen);
 
-    auto window = XCreateSimpleWindow(
-        display, root, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT, 0, None, None
+    enum { BITS_PER_PIXEL = 24 };
+    GLint attributes[] = {
+        GLX_RGBA, GLX_DEPTH_SIZE, BITS_PER_PIXEL, GLX_DOUBLEBUFFER, None};
+    auto visual = glXChooseVisual(display, 0, attributes);
+    auto glc = glXCreateContext(display, visual, NULL, GL_TRUE);
+
+    auto cmap = XCreateColormap(display, root, visual->visual, AllocNone);
+    auto swa = (XSetWindowAttributes){
+        .colormap = cmap,
+        .event_mask = ExposureMask | KeyPressMask | StructureNotifyMask,
+    };
+
+    auto window = XCreateWindow(
+        display, root, 0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT, 0, visual->depth,
+        InputOutput, visual->visual, CWColormap | CWEventMask, &swa
     );
 
-    XStoreName(display, window, "iv");
-    XSelectInput(
-        display, window, ExposureMask | KeyPressMask | StructureNotifyMask
-    );
-    XSetWindowBackgroundPixmap(display, window, None);
-    XMapWindow(display, window);
+    glXMakeCurrent(display, window, glc);
 
     imlib_context_set_image(images.items[0].im);
-    imlib_context_set_display(display);
-    imlib_context_set_visual(DefaultVisual(display, screen));
-    imlib_context_set_drawable(window);
+
+    auto shader_program = set_up_opengl(&images);
+
+    XStoreName(display, window, "iv");
+    XSetWindowBackgroundPixmap(display, window, None);
+    XMapWindow(display, window);
 
     auto atom_wm_delete_window = XInternAtom(display, "WM_DELETE_WINDOW", 0);
     XSetWMProtocols(display, window, &atom_wm_delete_window, 1);
@@ -106,15 +186,10 @@ static App app_new(Images images) {
         .atom_wm_delete_window = atom_wm_delete_window,
         .img = &images.items[0],
         .images = images,
+        .shader_program = shader_program,
         .dirty = false,
         .quit = false,
     };
-}
-
-static void render_background(
-    App const *app, int x, int y, unsigned width, unsigned height
-) {
-    XFillRectangle(app->display, app->window, app->gc, x, y, width, height);
 }
 
 static int rendered_image_width(float zoom_level) {
@@ -125,127 +200,24 @@ static int rendered_image_height(float zoom_level) {
     return (int)((float)imlib_image_get_height() * zoom_level);
 }
 
-static void
-clip_image_top(App const *app, int x, int *y, int width, int *height) {
-    auto img = app->img;
-    auto edge =
-        (app->window_height - rendered_image_height(img->zoom.level)) / 2 -
-        img->pan.y;
-    if (*y < edge) {
-        auto background_height = *y + *height > edge ? edge - *y : *height;
-        render_background(
-            app, x, *y, (unsigned)width, (unsigned)background_height
-        );
-        *height -= background_height;
-        *y += background_height;
-    }
-}
-
-static void
-clip_image_left(App const *app, int *x, int y, int *width, int height) {
-    auto img = app->img;
-    auto edge =
-        (app->window_width - rendered_image_width(img->zoom.level)) / 2 -
-        img->pan.x;
-    if (*x < edge) {
-        auto background_width = *x + *width > edge ? edge - *x : *width;
-        render_background(
-            app, *x, y, (unsigned)background_width, (unsigned)height
-        );
-        *width -= background_width;
-        *x += background_width;
-    }
-}
-
-static void
-clip_image_bottom(App const *app, int x, int y, int width, int *height) {
-    auto img = app->img;
-    auto edge =
-        (rendered_image_height(img->zoom.level) + app->window_height) / 2 +
-        img->pan.y;
-    if (edge < app->window_height) {
-        auto background_height = y > edge ? *height : y + *height - edge;
-        render_background(
-            app, x, edge, (unsigned)width, (unsigned)background_height
-        );
-        *height = edge - y;
-    }
-}
-
-static void
-clip_image_right(App const *app, int x, int y, int *width, int height) {
-    auto img = app->img;
-    auto edge =
-        (rendered_image_width(img->zoom.level) + app->window_width) / 2 +
-        img->pan.x;
-    if (edge < app->window_width) {
-        auto background_width = x > edge ? *width : x + *width - edge;
-        render_background(
-            app, edge, y, (unsigned)background_width, (unsigned)height
-        );
-        *width = edge - x;
-    }
-}
-
-static void render(App const *app, Imlib_Updates updates) {
-    auto img = app->img;
-    int x = 0;
-    int y = 0;
-    int width = 0;
-    int height = 0;
-    imlib_updates_get_coordinates(updates, &x, &y, &width, &height);
-    clip_image_top(app, x, &y, width, &height);
-    clip_image_left(app, &x, y, &width, height);
-    clip_image_bottom(app, x, y, width, &height);
-    clip_image_right(app, x, y, &width, height);
-    auto source_width = (int)((float)width / img->zoom.level);
-    auto source_height = (int)((float)height / img->zoom.level);
-    auto source_x =
-        (int)(((float)(x + img->pan.x) - (float)app->window_width / 2) /
-              img->zoom.level) +
-        imlib_image_get_width() / 2;
-    auto source_y =
-        (int)(((float)(y + img->pan.y) - (float)app->window_height / 2) /
-              img->zoom.level) +
-        imlib_image_get_height() / 2;
-    if (source_x < 0) {
-        source_width -= source_x;
-        source_x = 0;
-    }
-    if (source_y < 0) {
-        source_height -= source_y;
-        source_y = 0;
-    }
-    if (source_width < 0) {
-        (void)fputs("warning: source_width < 0\n", stderr);
-        return;
-    }
-    if (source_height < 0) {
-        (void)fputs("warning: source_height < 0\n", stderr);
-        return;
-    }
-    imlib_render_image_part_on_drawable_at_size(
-        source_x, source_y, source_width, source_height, x, y, width, height
+static void render(App *const app) {
+    glViewport(0, 0, app->window_width, app->window_height);
+    glUniform2f(
+        glGetUniformLocation(app->shader_program, "pan"),
+        (float)app->img->pan.x / (float)app->window_width * 2,
+        (float)app->img->pan.y / (float)app->window_height * 2
     );
-}
-
-static void render_all_updates(App *app, Imlib_Updates updates) {
-    if (app->dirty) {
-        app->dirty = false;
-        imlib_updates_free(updates);
-        updates = imlib_update_append_rect(
-            NULL, 0, 0, app->window_width, app->window_height
-        );
-    } else {
-        updates = imlib_updates_merge_for_rendering(
-            updates, app->window_width, app->window_height
-        );
-    }
-    for (auto update = updates; update;
-         update = imlib_updates_get_next(update)) {
-        render(app, update);
-    }
-    imlib_updates_free(updates);
+    glUniform2f(
+        glGetUniformLocation(app->shader_program, "zoom"),
+        app->img->zoom.level * (float)imlib_image_get_width() /
+            (float)app->window_width,
+        app->img->zoom.level * (float)imlib_image_get_height() /
+            (float)app->window_height
+    );
+    glClear(GL_COLOR_BUFFER_BIT);
+    enum { VERTEX_COUNT = 6 };
+    glDrawArrays(GL_TRIANGLES, 0, VERTEX_COUNT);
+    glXSwapBuffers(app->display, app->window);
 }
 
 static void center_image(App *app) {
@@ -309,6 +281,14 @@ static void switch_image(App *app, int offset) {
     app->img = &app->images.items[index];
     imlib_context_set_image(app->img->im);
     app->dirty = true;
+
+    auto image_data = imlib_image_get_data_for_reading_only();
+    auto width = imlib_image_get_width();
+    auto height = imlib_image_get_height();
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+        image_data
+    );
 }
 
 static void handle_key_press(App *app, XKeyEvent *event) {
@@ -328,10 +308,10 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         set_zoom_level(app, 1.0f);
         break;
     case XK_h:
-        set_pan_x(app, app->img->pan.x - app->window_width / PAN_AMOUNT);
+        set_pan_x(app, app->img->pan.x + app->window_width / PAN_AMOUNT);
         break;
     case XK_l:
-        set_pan_x(app, app->img->pan.x + app->window_width / PAN_AMOUNT);
+        set_pan_x(app, app->img->pan.x - app->window_width / PAN_AMOUNT);
         break;
     case XK_k:
         set_pan_y(app, app->img->pan.y - app->window_height / PAN_AMOUNT);
@@ -340,20 +320,16 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         set_pan_y(app, app->img->pan.y + app->window_height / PAN_AMOUNT);
         break;
     case XK_H:
-        set_pan_x(app, INT_MIN);
+        set_pan_x(app, INT_MAX);
         break;
     case XK_K:
         set_pan_y(app, INT_MIN);
         break;
     case XK_L:
-        set_pan_x(app, INT_MAX);
+        set_pan_x(app, INT_MIN);
         break;
     case XK_J:
         set_pan_y(app, INT_MAX);
-        break;
-    case XK_a:
-        imlib_context_set_anti_alias(imlib_context_get_anti_alias() ? 0 : 1);
-        app->dirty = true;
         break;
     case XK_n:
         switch_image(app, +1);
@@ -366,18 +342,13 @@ static void handle_key_press(App *app, XKeyEvent *event) {
 }
 
 static void app_run(App *app) {
-    auto updates = imlib_updates_init();
-
     do {
         XEvent event;
         XNextEvent(app->display, &event);
         switch (event.type) {
-        case Expose: {
-            auto expose = event.xexpose;
-            updates = imlib_update_append_rect(
-                updates, expose.x, expose.y, expose.width, expose.height
-            );
-        } break;
+        case Expose:
+            render(app);
+            break;
         case KeyPress:
             handle_key_press(app, &event.xkey);
             break;
@@ -395,7 +366,13 @@ static void app_run(App *app) {
         }
     } while (XPending(app->display));
 
-    render_all_updates(app, updates);
+    if (app->dirty) {
+        app->dirty = false;
+        XClearArea(
+            app->display, app->window, 0, 0, (unsigned)app->window_width,
+            (unsigned)app->window_height, true
+        );
+    }
 }
 
 // lf breaks if it tries to resize really quickly after running a shell command,
@@ -461,6 +438,7 @@ static Images load_images(size_t argc, char *argv[]) {
 int main(int argc, char *argv[]) {
     auto images = load_images((size_t)argc, argv);
     auto app = app_new(images);
+    switch_image(&app, 0);
     while (!app.quit) {
         app_run(&app);
     }

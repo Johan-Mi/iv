@@ -6,6 +6,8 @@ Image viewer for X11.
 
 - X11
 - Imlib 2
+- OpenGL
+- GLEW
 
 ## Build instructions
 
