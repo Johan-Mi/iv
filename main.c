@@ -220,29 +220,6 @@ static void render(App *const app) {
     glXSwapBuffers(app->display, app->window);
 }
 
-static void center_image(App *app) {
-    auto img = app->img;
-    if (rendered_image_width(img->zoom.level) < app->window_width) {
-        img->pan.x = 0;
-        app->dirty = true;
-    }
-
-    if (rendered_image_height(img->zoom.level) < app->window_height) {
-        img->pan.y = 0;
-        app->dirty = true;
-    }
-}
-
-static void set_zoom_level(App *app, float level) {
-    auto img = app->img;
-    if (img->zoom.level != level) {
-        img->zoom.level = level;
-        center_image(app);
-        app->dirty = true;
-    }
-    img->zoom.mode = ZoomManual;
-}
-
 static int clamp_pan_x(App const *app, int x) {
     auto limit =
         (app->window_width - rendered_image_width(app->img->zoom.level)) / 2;
@@ -256,21 +233,36 @@ static int clamp_pan_y(App const *app, int y) {
 }
 
 static void set_pan_x(App *app, int x) {
-    if (rendered_image_width(app->img->zoom.level) <= app->window_width) {
-        return;
+    auto img = app->img;
+    x = rendered_image_width(app->img->zoom.level) <= app->window_width
+            ? 0
+            : clamp_pan_x(app, x);
+    if (img->pan.x != x) {
+        img->pan.x = x;
+        app->dirty = true;
     }
-
-    app->img->pan.x = clamp_pan_x(app, x);
-    app->dirty = true;
 }
 
 static void set_pan_y(App *app, int y) {
-    if (rendered_image_height(app->img->zoom.level) <= app->window_height) {
-        return;
+    auto img = app->img;
+    y = rendered_image_height(app->img->zoom.level) <= app->window_height
+            ? 0
+            : clamp_pan_y(app, y);
+    if (img->pan.y != y) {
+        img->pan.y = y;
+        app->dirty = true;
     }
+}
 
-    app->img->pan.y = clamp_pan_y(app, y);
-    app->dirty = true;
+static void set_zoom_level(App *app, float level) {
+    auto img = app->img;
+    if (img->zoom.level != level) {
+        img->zoom.level = level;
+        set_pan_x(app, img->pan.x);
+        set_pan_y(app, img->pan.y);
+        app->dirty = true;
+    }
+    img->zoom.mode = ZoomManual;
 }
 
 static void switch_image(App *app, int offset) {
@@ -356,7 +348,8 @@ static void app_run(App *app) {
             auto size = event.xconfigure;
             app->window_width = size.width;
             app->window_height = size.height;
-            center_image(app);
+            set_pan_x(app, app->img->pan.x);
+            set_pan_y(app, app->img->pan.y);
         } break;
         case ClientMessage:
             if ((Atom)event.xclient.data.l[0] == app->atom_wm_delete_window) {
