@@ -129,7 +129,7 @@ static void
 clip_image_top(App const *app, int x, int *y, int width, int *height) {
     auto img = app->img;
     auto edge =
-        (app->window_height - rendered_image_height(img->zoom.level)) / 2 +
+        (app->window_height - rendered_image_height(img->zoom.level)) / 2 -
         img->pan.y;
     if (*y < edge) {
         auto background_height = *y + *height > edge ? edge - *y : *height;
@@ -145,7 +145,7 @@ static void
 clip_image_left(App const *app, int *x, int y, int *width, int height) {
     auto img = app->img;
     auto edge =
-        (app->window_width - rendered_image_width(img->zoom.level)) / 2 +
+        (app->window_width - rendered_image_width(img->zoom.level)) / 2 -
         img->pan.x;
     if (*x < edge) {
         auto background_width = *x + *width > edge ? edge - *x : *width;
@@ -161,7 +161,7 @@ static void
 clip_image_bottom(App const *app, int x, int y, int width, int *height) {
     auto img = app->img;
     auto edge =
-        (rendered_image_height(img->zoom.level) + app->window_height) / 2 -
+        (rendered_image_height(img->zoom.level) + app->window_height) / 2 +
         img->pan.y;
     if (edge < app->window_height) {
         auto background_height = y > edge ? *height : y + *height - edge;
@@ -176,7 +176,7 @@ static void
 clip_image_right(App const *app, int x, int y, int *width, int height) {
     auto img = app->img;
     auto edge =
-        (rendered_image_width(img->zoom.level) + app->window_width) / 2 -
+        (rendered_image_width(img->zoom.level) + app->window_width) / 2 +
         img->pan.x;
     if (edge < app->window_width) {
         auto background_width = x > edge ? *width : x + *width - edge;
