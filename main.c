@@ -119,36 +119,43 @@ static void render_background(
 static void
 clip_image_top(App const *app, int x, int *y, int width, int *height) {
     auto img = app->img;
-    if (*y < -img->pan.y) {
-        auto background_height =
-            *y + *height > -img->pan.y ? -img->pan.y - *y : *height;
+    auto edge = (app->window_height -
+                 (int)((float)imlib_image_get_height() * img->zoom.level) +
+                 img->pan.y) /
+                2;
+    if (*y < edge) {
+        auto background_height = *y + *height > edge ? edge - *y : *height;
         render_background(
             app, x, *y, (unsigned)width, (unsigned)background_height
         );
-        *height += img->pan.y + *y;
-        *y = -img->pan.y;
+        *height -= background_height;
+        *y += background_height;
     }
 }
 
 static void
 clip_image_left(App const *app, int *x, int y, int *width, int height) {
     auto img = app->img;
-    if (*x < -img->pan.x) {
-        auto background_width =
-            *x + *width > -img->pan.x ? -img->pan.x - *x : *width;
+    auto edge =
+        (app->window_width -
+         (int)((float)imlib_image_get_width() * img->zoom.level) + img->pan.x) /
+        2;
+    if (*x < edge) {
+        auto background_width = *x + *width > edge ? edge - *x : *width;
         render_background(
             app, *x, y, (unsigned)background_width, (unsigned)height
         );
-        *width += img->pan.x + *x;
-        *x = -img->pan.x;
+        *width -= background_width;
+        *x += background_width;
     }
 }
 
 static void
 clip_image_bottom(App const *app, int x, int y, int width, int *height) {
     auto img = app->img;
-    auto edge =
-        (int)((float)imlib_image_get_height() * img->zoom.level) - img->pan.y;
+    auto edge = ((int)((float)imlib_image_get_height() * img->zoom.level) -
+                 img->pan.y + app->window_height) /
+                2;
     if (edge < app->window_height) {
         auto background_height = y > edge ? *height : y + *height - edge;
         render_background(
@@ -161,8 +168,9 @@ clip_image_bottom(App const *app, int x, int y, int width, int *height) {
 static void
 clip_image_right(App const *app, int x, int y, int *width, int height) {
     auto img = app->img;
-    auto edge =
-        (int)((float)imlib_image_get_width() * img->zoom.level) - img->pan.x;
+    auto edge = ((int)((float)imlib_image_get_width() * img->zoom.level) -
+                 img->pan.x + app->window_width) /
+                2;
     if (edge < app->window_width) {
         auto background_width = x > edge ? *width : x + *width - edge;
         render_background(
@@ -185,8 +193,14 @@ static void render(App const *app, Imlib_Updates updates) {
     clip_image_right(app, x, y, &width, height);
     auto source_width = (int)((float)width / img->zoom.level);
     auto source_height = (int)((float)height / img->zoom.level);
-    auto source_x = (int)((float)(x + img->pan.x) / img->zoom.level);
-    auto source_y = (int)((float)(y + img->pan.y) / img->zoom.level);
+    auto source_x =
+        (int)(((float)(x + img->pan.x) - (float)app->window_width / 2) /
+              img->zoom.level) +
+        imlib_image_get_width() / 2;
+    auto source_y =
+        (int)(((float)(y + img->pan.y) - (float)app->window_height / 2) /
+              img->zoom.level) +
+        imlib_image_get_height() / 2;
     imlib_render_image_part_on_drawable_at_size(
         source_x, source_y, source_width, source_height, x, y, width, height
     );
@@ -215,17 +229,13 @@ static void center_image(App *app) {
     auto img = app->img;
     if ((int)((float)imlib_image_get_width() * img->zoom.level) <
         app->window_width) {
-        img->pan.x = ((int)((float)imlib_image_get_width() * img->zoom.level) -
-                      app->window_width) /
-                     2;
+        img->pan.x = 0;
         app->dirty = true;
     }
 
     if ((int)((float)imlib_image_get_height() * img->zoom.level) <
         app->window_height) {
-        img->pan.y = ((int)((float)imlib_image_get_height() * img->zoom.level) -
-                      app->window_height) /
-                     2;
+        img->pan.y = 0;
         app->dirty = true;
     }
 }
@@ -241,24 +251,17 @@ static void set_zoom_level(App *app, float level) {
 }
 
 static int clamp_pan_x(App const *app, int x) {
-    if (x < 0) {
-        return 0;
-    }
-    auto image_width =
-        (int)((float)imlib_image_get_width() * app->img->zoom.level);
-    return x > image_width - app->window_width ? image_width - app->window_width
-                                               : x;
+    auto limit = (app->window_width - (int)((float)imlib_image_get_width() *
+                                            app->img->zoom.level)) /
+                 2;
+    return x < limit ? limit : x > -limit ? -limit : x;
 }
 
 static int clamp_pan_y(App const *app, int y) {
-    if (y < 0) {
-        return 0;
-    }
-    auto image_height =
-        (int)((float)imlib_image_get_height() * app->img->zoom.level);
-    return y > image_height - app->window_height
-               ? image_height - app->window_height
-               : y;
+    auto limit = (app->window_height - (int)((float)imlib_image_get_height() *
+                                             app->img->zoom.level)) /
+                 2;
+    return y < limit ? limit : y > -limit ? -limit : y;
 }
 
 static void set_pan_x(App *app, int x) {
@@ -320,10 +323,18 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         set_pan_y(app, app->img->pan.y + app->window_height / PAN_AMOUNT);
         break;
     case XK_H:
-        set_pan_x(app, 0);
+        set_pan_x(
+            app, (app->window_width -
+                  (int)((float)imlib_image_get_width() * app->img->zoom.level)
+                 ) / 2
+        );
         break;
     case XK_K:
-        set_pan_y(app, 0);
+        set_pan_y(
+            app, (app->window_height -
+                  (int)((float)imlib_image_get_height() * app->img->zoom.level)
+                 ) / 2
+        );
         break;
     case XK_a:
         imlib_context_set_anti_alias(imlib_context_get_anti_alias() ? 0 : 1);
