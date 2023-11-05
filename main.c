@@ -1,6 +1,7 @@
 #include <Imlib2.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -323,30 +324,16 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         set_pan_y(app, app->img->pan.y + app->window_height / PAN_AMOUNT);
         break;
     case XK_H:
-        set_pan_x(
-            app,
-            (app->window_width - rendered_image_width(app->img->zoom.level)) / 2
-        );
+        set_pan_x(app, INT_MIN);
         break;
     case XK_K:
-        set_pan_y(
-            app,
-            (app->window_height - rendered_image_height(app->img->zoom.level)) /
-                2
-        );
+        set_pan_y(app, INT_MIN);
         break;
     case XK_L:
-        set_pan_x(
-            app,
-            (rendered_image_width(app->img->zoom.level) - app->window_width) / 2
-        );
+        set_pan_x(app, INT_MAX);
         break;
     case XK_J:
-        set_pan_y(
-            app,
-            (rendered_image_height(app->img->zoom.level) - app->window_height) /
-                2
-        );
+        set_pan_y(app, INT_MAX);
         break;
     case XK_a:
         imlib_context_set_anti_alias(imlib_context_get_anti_alias() ? 0 : 1);
