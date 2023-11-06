@@ -163,8 +163,6 @@ static App app_new(Images images) {
 
     glXMakeCurrent(display, window, glc);
 
-    imlib_context_set_image(images.items[0].im);
-
     auto shader_program = set_up_opengl();
 
     XStoreName(display, window, "iv");
