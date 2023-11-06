@@ -91,7 +91,7 @@ static char const *const fragment_source = "#version 150 core\n\
         color = texture(tex, texcoord).bgra;\n\
     }";
 
-static GLuint set_up_opengl(Images *const images) {
+static GLuint set_up_opengl(void) {
     glewInit();
 
     float vertices[] = {-1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f,
@@ -114,7 +114,7 @@ static GLuint set_up_opengl(Images *const images) {
     glAttachShader(shader_program, fragment_shader);
 
     GLuint tex = 0;
-    glGenTextures((GLsizei)images->count, &tex);
+    glGenTextures(1, &tex);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, tex);
     glUniform1i(glGetUniformLocation(shader_program, "tex"), 0);
@@ -170,7 +170,7 @@ static App app_new(Images images) {
 
     imlib_context_set_image(images.items[0].im);
 
-    auto shader_program = set_up_opengl(&images);
+    auto shader_program = set_up_opengl();
 
     XStoreName(display, window, "iv");
     XSetWindowBackgroundPixmap(display, window, None);
