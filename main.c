@@ -1,7 +1,6 @@
 #include <GL/glew.h>
 #include <GL/glx.h>
 #include <Imlib2.h>
-#include <X11/keysym.h>
 #include <limits.h>
 #include <math.h>
 #include <stdbool.h>
