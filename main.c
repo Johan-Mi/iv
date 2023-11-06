@@ -260,24 +260,6 @@ static void set_zoom_level(App *app, float level) {
     }
 }
 
-static void switch_image(App *app, int offset) {
-    auto index = (size_t)(app->img - app->images.items + offset);
-    if (index >= app->images.count) {
-        return;
-    }
-    app->img = &app->images.items[index];
-    imlib_context_set_image(app->img->im);
-    app->dirty = true;
-
-    auto image_data = imlib_image_get_data_for_reading_only();
-    auto width = imlib_image_get_width();
-    auto height = imlib_image_get_height();
-    glTexImage2D(
-        GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-        image_data
-    );
-}
-
 static void auto_zoom(App *app) {
     auto img = app->img;
     switch (img->zoom.mode) {
@@ -290,6 +272,25 @@ static void auto_zoom(App *app) {
     } break;
     default:;
     }
+}
+
+static void switch_image(App *app, int offset) {
+    auto index = (size_t)(app->img - app->images.items + offset);
+    if (index >= app->images.count) {
+        return;
+    }
+    app->img = &app->images.items[index];
+    imlib_context_set_image(app->img->im);
+    auto_zoom(app);
+    app->dirty = true;
+
+    auto image_data = imlib_image_get_data_for_reading_only();
+    auto width = imlib_image_get_width();
+    auto height = imlib_image_get_height();
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+        image_data
+    );
 }
 
 static void handle_key_press(App *app, XKeyEvent *event) {
