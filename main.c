@@ -79,7 +79,7 @@ static char const *const vertex_source = "#version 150 core\n\
     uniform vec2 pan;\n\
     uniform vec2 zoom;\n\
     void main() {\n\
-        texcoord = (position * vec2(-1.0, 1.0) + vec2(1.0)) / 2.0;\n\
+        texcoord = position * vec2(-0.5, 0.5) + vec2(0.5);\n\
         gl_Position = vec4(-position * zoom + pan, 0.0, 1.0);\n\
     }";
 
