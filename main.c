@@ -63,7 +63,6 @@ typedef struct {
 typedef struct {
     Display *display;
     Window window;
-    GC gc;
     int window_width, window_height;
     Atom atom_wm_delete_window;
     Image *img;
@@ -182,7 +181,6 @@ static App app_new(Images images) {
     return (App){
         .display = display,
         .window = window,
-        .gc = DefaultGC(display, screen),
         .window_width = DEFAULT_WIDTH,
         .window_height = DEFAULT_HEIGHT,
         .atom_wm_delete_window = atom_wm_delete_window,
