@@ -4,6 +4,7 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <limits.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,7 @@ static float larger_zoom(float level) {
 
 typedef enum {
     ZoomManual,
+    ZoomFitDownscale,
 } ZoomMode;
 
 typedef struct {
@@ -262,7 +264,6 @@ static void set_zoom_level(App *app, float level) {
         set_pan_y(app, img->pan.y);
         app->dirty = true;
     }
-    img->zoom.mode = ZoomManual;
 }
 
 static void switch_image(App *app, int offset) {
@@ -283,6 +284,20 @@ static void switch_image(App *app, int offset) {
     );
 }
 
+static void auto_zoom(App *app) {
+    auto img = app->img;
+    switch (img->zoom.mode) {
+    case ZoomFitDownscale: {
+        auto fit = fminf(
+            (float)app->window_width / (float)imlib_image_get_width(),
+            (float)app->window_height / (float)imlib_image_get_height()
+        );
+        set_zoom_level(app, fminf(fit, 1.0f));
+    } break;
+    default:;
+    }
+}
+
 static void handle_key_press(App *app, XKeyEvent *event) {
     KeySym key = 0;
     XLookupString(event, NULL, 0, &key, NULL);
@@ -291,13 +306,20 @@ static void handle_key_press(App *app, XKeyEvent *event) {
         app->quit = true;
         break;
     case XK_minus:
+        app->img->zoom.mode = ZoomManual;
         set_zoom_level(app, smaller_zoom(app->img->zoom.level));
         break;
     case XK_plus:
+        app->img->zoom.mode = ZoomManual;
         set_zoom_level(app, larger_zoom(app->img->zoom.level));
         break;
     case XK_equal:
+        app->img->zoom.mode = ZoomManual;
         set_zoom_level(app, 1.0f);
+        break;
+    case XK_w:
+        app->img->zoom.mode = ZoomFitDownscale;
+        auto_zoom(app);
         break;
     case XK_h:
         set_pan_x(app, app->img->pan.x + app->window_width / PAN_AMOUNT);
@@ -348,6 +370,7 @@ static void app_run(App *app) {
             auto size = event.xconfigure;
             app->window_width = size.width;
             app->window_height = size.height;
+            auto_zoom(app);
             set_pan_x(app, app->img->pan.x);
             set_pan_y(app, app->img->pan.y);
         } break;
@@ -415,7 +438,7 @@ static Images load_images(size_t argc, char *argv[]) {
         images[image_count++] = (Image){
             .pan = {.x = 0, .y = 0},
             .im = image,
-            .zoom = {.level = 1.0f, .mode = ZoomManual},
+            .zoom = {.level = 1.0f, .mode = ZoomFitDownscale},
         };
     }
 
