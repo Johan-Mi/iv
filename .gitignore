@@ -1,2 +1,2 @@
-main
-compile_flags.txt
+/.zig-cache
+/zig-out
