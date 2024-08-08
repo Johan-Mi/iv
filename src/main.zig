@@ -66,7 +66,13 @@ const App = struct {
         const screen = c.DefaultScreen(display);
         const root = c.RootWindow(display, screen);
         const bits_per_pixel = 24;
-        var attributes = [_]c_int{ 4, 12, bits_per_pixel, 5, 0 };
+        var attributes = [_]c_int{
+            c.GLX_RGBA,
+            c.GLX_DEPTH_SIZE,
+            bits_per_pixel,
+            c.GLX_DOUBLEBUFFER,
+            0,
+        };
         const visual = c.glXChooseVisual(display, 0, &attributes);
         const glc = c.glXCreateContext(display, visual, null, 1);
         const cmap = c.XCreateColormap(display, root, visual.*.visual, 0);
